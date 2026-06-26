@@ -70,21 +70,9 @@ async function sendMessage() {
 
   try {
     const pageInfo = await getCurrentTabInfo();
-    const systemPrompt = `你是一个浏览器助手。每轮先 explore 查看页面再操作。
-
-规则:
-- 每轮: <TOOL>explore</TOOL> 探索页面 → 发出操作指令
-- 操作跟在 explore 后面一起发
-- 不要截图
-- 完成后回复 ✅ 完成
-
-示例:
-<TOOL>explore</TOOL>
-<TOOL>click||广州二手房</TOOL>
-<TOOL>wait|2000</TOOL>
-<TOOL>explore</TOOL>
-<TOOL>click||价格排序</TOOL>
-<TOOL>extract</TOOL>
+    const systemPrompt = `你是一个浏览器助手。利用提供的工具操作浏览器完成任务。
+先用 explore 查看页面，按需使用工具。
+不需要截图。任务完成时调用 done。
 
 当前页面: ${pageInfo.url}`;
 
@@ -112,33 +100,44 @@ async function sendMessage() {
       const aiText = result.text;
       console.log(`[AI 第${round}轮]`, aiText.slice(0, 300));
 
-      const toolRegex = /<TOOL>([\s\S]*?)<\/TOOL>/g;
-      const tools = [];
-      let m;
-      while ((m = toolRegex.exec(aiText)) !== null) tools.push(m[1].trim());
+            const toolCalls = result.toolCalls || [];
+      console.log("[AI round " + round + "]", toolCalls.length + " tool calls");
 
-      if (tools.length === 0) {
-        fullReply = aiText;
+      if (toolCalls.length === 0) {
+        fullReply = result.text || "";
         break;
       }
 
-      for (let i = 0; i < tools.length; i++) {
-        const toolCmd = tools[i];
-        setStatus(`⚡ ${toolCmd.split("|")[0]} (${i + 1}/${tools.length})`);
-        const r = await executeToolCommand(toolCmd);
-        if (r.imageUrl) allImages.push(r.imageUrl);
+      for (const tc of toolCalls) {
+        if (tc.name === "done") {
+          fullReply = tc.args.summary || result.text || "";
+          break;
+        }
+        setStatus("⚡ " + tc.name);
+        const r = await executeToolCall(tc);
+        if (r && r.imageUrl) allImages.push(r.imageUrl);
       }
+      if (fullReply) break;
 
       const newPage = await getCurrentTabInfo();
-      messages.push({ role: "assistant", content: aiText });
+
+      for (const tc of toolCalls) {
+        if (tc.name === "done") continue;
+        messages.push({
+          role: "assistant",
+          content: null,
+          tool_calls: [{ id: tc.id || "call_1", type: "function", function: { name: tc.name, arguments: JSON.stringify(tc.args) } }]
+        });
+        messages.push({
+          role: "tool",
+          tool_call_id: tc.id || "call_1",
+          content: "OK"
+        });
+      }
       messages.push({
         role: "user",
-        content: `已执行。当前页面URL: ${newPage.url}
-标题: ${newPage.title}
-
-继续操作或回复 ✅ 完成。`,
-      });
-    }
+        content: "Current page URL: " + newPage.url + "\nTitle: " + newPage.title
+      });    }
 
     if (fullReply) {
       const displayText = fullReply.replace(/<TOOL>[\s\S]*?<\/TOOL>/g, "").trim();
@@ -162,6 +161,26 @@ async function sendMessage() {
     chatSend.disabled = false;
   }
 }
+async function executeToolCall(tc) {
+  const name = tc.name;
+  const args = tc.args || {};
+  switch (name) {
+    case "explore": return executeToolCommand("explore");
+    case "screenshot": return executeToolCommand("screenshot");
+    case "click": {
+      const cmd = args.text ? "click||" + args.text : "click|" + (args.selector || "");
+      return executeToolCommand(cmd);
+    }
+    case "fill": return executeToolCommand("fill|" + (args.selector || "") + "|" + (args.value || ""));
+    case "extract": return executeToolCommand("extract" + (args.selector ? "|" + args.selector : ""));
+    case "scroll": return executeToolCommand("scroll|" + (args.direction || "down") + "|" + (args.amount || 500));
+    case "navigate": return executeToolCommand("navigate|" + (args.url || ""));
+    case "wait": return executeToolCommand("wait|" + (args.ms || 2000));
+    case "pressKey": return executeToolCommand("pressKey|" + (args.key || "Enter"));
+    default: return { text: "Unknown tool: " + name };
+  }
+}
+
 async function executeToolCommand(cmd) {
   try {
     const parts = cmd.split("|").map((s) => s.trim());
