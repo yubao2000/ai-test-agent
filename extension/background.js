@@ -55,6 +55,30 @@ const handlers = {
     return { success: true, title: tab.title };
   },
 
+  async reload(req) {
+    const tabId = req.tabId || (await getActiveTab()).id;
+    await chrome.tabs.reload(tabId);
+    return { success: true };
+  },
+
+  async back(req) {
+    const tabId = req.tabId || (await getActiveTab()).id;
+    await chrome.tabs.goBack(tabId);
+    return { success: true };
+  },
+
+  async forward(req) {
+    const tabId = req.tabId || (await getActiveTab()).id;
+    await chrome.tabs.goForward(tabId);
+    return { success: true };
+  },
+
+  async wait(req) {
+    const ms = req.ms || 2000;
+    await new Promise((r) => setTimeout(r, ms));
+    return { success: true };
+  },
+
   // --- 截图 ---
   async screenshot(req) {
     const tabId = req.tabId || (await getActiveTab()).id;

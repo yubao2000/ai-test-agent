@@ -76,22 +76,33 @@ async function sendMessage() {
 - URL: ${pageInfo.url}
 - Title: ${pageInfo.title}
 
-你可以使用以下工具来操作浏览器。当你需要执行操作时，在回复中插入下方格式的指令：
+你可以使用以下工具来操作浏览器。回复时插入 <TOOL>指令</TOOL> 即可执行操作：
 
-截图当前页面：<TOOL>screenshot</TOOL>
-点击元素：<TOOL>click|.selector</TOOL> 或 <TOOL>click||登录</TOOL>
-填写输入框：<TOOL>fill|#username|admin</TOOL>
-提取文字：<TOOL>extract</TOOL> 或 <TOOL>extract|.article</TOOL>
-滚动页面：<TOOL>scroll|down|500</TOOL> 或 <TOOL>scroll|top</TOOL>
-跳转页面：<TOOL>navigate|https://example.com</TOOL>
-执行 JS：<TOOL>evaluate|document.title</TOOL>
-获取 URL：<TOOL>getUrl</TOOL>
-获取标题：<TOOL>getTitle</TOOL>
+📸 截图：<TOOL>screenshot</TOOL>
+🖱️ 点击：<TOOL>click|.selector</TOOL> 或按文本 <TOOL>click||登录</TOOL>
+✋ 右键：<TOOL>rightClick||登录</TOOL>
+⌨️ 填表：<TOOL>fill|#username|admin</TOOL>
+🗑️ 清空：<TOOL>clear|#input</TOOL>
+🔍 悬停：<TOOL>hover||帮助</TOOL>
+✨ 高亮：<TOOL>highlight|.btn</TOOL>
+⌨️ 按键：<TOOL>pressKey|Enter</TOOL>
+🔽 下拉选择：<TOOL>select|#city|beijing</TOOL>
+📄 提取文字：<TOOL>extract</TOOL> 或 <TOOL>extract|.article</TOOL>
+🔗 所有链接：<TOOL>getLinks</TOOL>
+🖼️ 所有图片：<TOOL>getImages</TOOL>
+📊 表格数据：<TOOL>getTable</TOOL> 或 <TOOL>getTable|#table</TOOL>
+📝 表单字段：<TOOL>getFormFields</TOOL>
+⬇️ 滚动：<TOOL>scroll|down|500</TOOL> 或 <TOOL>scroll|top</TOOL>
+🔄 刷新：<TOOL>reload</TOOL>
+⬅️ 后退：<TOOL>back</TOOL>
+➡️ 前进：<TOOL>forward</TOOL>
+🌐 跳转：<TOOL>navigate|https://...</TOOL>
+🔗 当前URL：<TOOL>getUrl</TOOL>
+📌 标题：<TOOL>getTitle</TOOL>
+⚡ 执行JS：<TOOL>evaluate|document.title</TOOL>
+⏱️ 等待：<TOOL>wait|3000</TOOL>
 
-示例回复：
-"我来帮你截图当前页面：
-<TOOL>screenshot</TOOL>
-截图完成！"`;
+回复时文字和 <TOOL> 指令混用即可，工具执行结果会自动显示。`;
 
     const messages = [
       { role: "system", content: systemPrompt },
@@ -154,21 +165,87 @@ async function executeToolCommand(cmd) {
         }
         return `<div class="tool-result">❌ 截图失败: ${r.error}</div>`;
       }
-      case "click": {
-        const r = await chrome.runtime.sendMessage({ action: "click", tabId: currentTabId, selector: params[0], text: params[1] });
-        return `<div class="tool-result">${r.success ? "✅" : "❌"} 点击: ${params[0] || params[1]} ${r.success ? "成功" : r.error}</div>`;
+      case "click":
+      case "rightClick": {
+        const r = await chrome.runtime.sendMessage({ action, tabId: currentTabId, selector: params[0], text: params[1] });
+        return `<div class="tool-result">${r.success ? "✅" : "❌"} ${action}: ${params[0] || params[1]} ${r.success ? "成功" : r.error}</div>`;
       }
       case "fill": {
         const r = await chrome.runtime.sendMessage({ action: "fill", tabId: currentTabId, selector: params[0], value: params.slice(1).join("|") });
         return `<div class="tool-result">${r.success ? "✅" : "❌"} 填写 ${params[0]} ${r.success ? "成功" : r.error}</div>`;
       }
+      case "clear": {
+        const r = await chrome.runtime.sendMessage({ action: "clear", tabId: currentTabId, selector: params[0] });
+        return `<div class="tool-result">${r.success ? "✅" : "❌"} 清空 ${params[0]} ${r.success ? "成功" : r.error}</div>`;
+      }
+      case "hover": {
+        const r = await chrome.runtime.sendMessage({ action: "hover", tabId: currentTabId, selector: params[0], text: params[1] });
+        return `<div class="tool-result">${r.success ? "✅" : "❌"} 悬停 ${params[0] || params[1]}</div>`;
+      }
+      case "highlight": {
+        const r = await chrome.runtime.sendMessage({ action: "highlight", tabId: currentTabId, selector: params[0], text: params[1] });
+        return `<div class="tool-result">${r.success ? "✨" : "❌"} 高亮 ${params[0] || params[1]}</div>`;
+      }
+      case "pressKey": {
+        const r = await chrome.runtime.sendMessage({ action: "pressKey", tabId: currentTabId, key: params[0] || "Enter", selector: params[1] });
+        return `<div class="tool-result">${r.success ? "✅" : "❌"} 按键: ${params[0] || "Enter"}</div>`;
+      }
+      case "select": {
+        const r = await chrome.runtime.sendMessage({ action: "select", tabId: currentTabId, selector: params[0], value: params[1] });
+        return `<div class="tool-result">${r.success ? "✅" : "❌"} 选择 ${params[1]} ${r.success ? "成功" : r.error}</div>`;
+      }
       case "extract": {
         const r = await chrome.runtime.sendMessage({ action: "extract", tabId: currentTabId, selector: params[0] || undefined });
         return `<div class="tool-result">${r.success ? `📄 ${(r.text || "").slice(0, 500)}` : `❌ ${r.error}`}</div>`;
       }
+      case "getLinks": {
+        const r = await chrome.runtime.sendMessage({ action: "getLinks", tabId: currentTabId });
+        if (r.success) {
+          const links = (r.links || []).slice(0, 20).map((l) => `• <a href="${l.href}" target="_blank">${l.text || l.href}</a>`).join("<br>");
+          return `<div class="tool-result">🔗 共 ${(r.links || []).length} 个链接:<br>${links}</div>`;
+        }
+        return `<div class="tool-result">❌ ${r.error}</div>`;
+      }
+      case "getImages": {
+        const r = await chrome.runtime.sendMessage({ action: "getImages", tabId: currentTabId });
+        if (r.success) {
+          const imgs = (r.images || []).slice(0, 10).map((img) => `• ${img.alt || "无alt"} (${img.width}×${img.height})`).join("<br>");
+          return `<div class="tool-result">🖼️ 共 ${(r.images || []).length} 张图片:<br>${imgs}</div>`;
+        }
+        return `<div class="tool-result">❌ ${r.error}</div>`;
+      }
+      case "getTable": {
+        const r = await chrome.runtime.sendMessage({ action: "getTable", tabId: currentTabId, selector: params[0] || undefined });
+        if (r.success) {
+          const headers = (r.headers || []).join(" | ");
+          const rows = (r.data || []).slice(0, 5).map((row) => Object.values(row).join(" | ")).join("<br>");
+          return `<div class="tool-result">📊 表格 ${(r.data || []).length} 行<br>${headers}<br>${rows}</div>`;
+        }
+        return `<div class="tool-result">❌ ${r.error}</div>`;
+      }
+      case "getFormFields": {
+        const r = await chrome.runtime.sendMessage({ action: "getFormFields", tabId: currentTabId, selector: params[0] || undefined });
+        if (r.success) {
+          const fields = (r.fields || []).map((f) => `• ${f.name || f.selector} (${f.type})${f.placeholder ? `: ${f.placeholder}` : ""}`).join("<br>");
+          return `<div class="tool-result">📝 表单字段:<br>${fields}</div>`;
+        }
+        return `<div class="tool-result">❌ ${r.error}</div>`;
+      }
       case "scroll": {
         const r = await chrome.runtime.sendMessage({ action: "scroll", tabId: currentTabId, direction: params[0], amount: parseInt(params[1]) || 500 });
         return `<div class="tool-result">✅ 滚动 ${params[0]}</div>`;
+      }
+      case "reload": {
+        const r = await chrome.runtime.sendMessage({ action: "reload", tabId: currentTabId });
+        return `<div class="tool-result">${r.success ? "✅" : "❌"} 刷新页面</div>`;
+      }
+      case "back": {
+        const r = await chrome.runtime.sendMessage({ action: "back", tabId: currentTabId });
+        return `<div class="tool-result">${r.success ? "✅" : "❌"} 后退</div>`;
+      }
+      case "forward": {
+        const r = await chrome.runtime.sendMessage({ action: "forward", tabId: currentTabId });
+        return `<div class="tool-result">${r.success ? "✅" : "❌"} 前进</div>`;
       }
       case "navigate": {
         const r = await chrome.runtime.sendMessage({ action: "navigate", tabId: currentTabId, url: params[0] });
@@ -185,6 +262,10 @@ async function executeToolCommand(cmd) {
       case "evaluate": {
         const r = await chrome.runtime.sendMessage({ action: "evaluate", tabId: currentTabId, code: params[0] });
         return `<div class="tool-result">${r.success ? `结果: ${r.result}` : `❌ ${r.error}`}</div>`;
+      }
+      case "wait": {
+        const r = await chrome.runtime.sendMessage({ action: "wait", ms: parseInt(params[0]) || 2000 });
+        return `<div class="tool-result">⏱️ 等待 ${params[0] || 2000}ms</div>`;
       }
       default:
         return `<div class="tool-result">⚠️ 未知指令: ${action}</div>`;
