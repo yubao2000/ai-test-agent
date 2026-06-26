@@ -93,8 +93,10 @@ const handlers = {
 
   // --- 截图 ---
   async screenshot(req) {
-    const tabId = req.tabId || (await getActiveTab()).id;
-    const dataUrl = await chrome.tabs.captureVisibleTab(tabId, { format: "png" });
+    let tabId = req.tabId || (await getActiveTab()).id;
+    // captureVisibleTab 需要 windowId，从 tab 获取
+    const tab = await chrome.tabs.get(tabId);
+    const dataUrl = await chrome.tabs.captureVisibleTab(tab.windowId, { format: "png" });
     return { success: true, dataUrl };
   },
 
