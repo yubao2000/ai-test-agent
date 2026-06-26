@@ -70,7 +70,7 @@ async function sendMessage() {
 
   try {
     const pageInfo = await getCurrentTabInfo();
-    const systemPrompt = `你是一个浏览器助手。先用 explore 了解页面有哪些元素。
+    const systemPrompt = `你是一个浏览器助手。用 <TOOL> 指令操作浏览器。先用 explore 了解页面。
 
 步骤:
 1. 先发 <TOOL>explore</TOOL> 查看页面上有什么
@@ -100,6 +100,7 @@ async function sendMessage() {
     }
 
     const aiText = result.text;
+    console.log("[AI]", aiText.slice(0,500));
 
     const toolRegex = /<TOOL>([\s\S]*?)<\/TOOL>/g;
     const tools = [];
@@ -107,7 +108,7 @@ async function sendMessage() {
     while ((m = toolRegex.exec(aiText)) !== null) tools.push(m[1].trim());
 
     if (tools.length === 0) {
-      addMessage("ai", aiText);
+      addMessage("ai", aiText || "(AI 没有返回任何操作)");
       setStatus("✅ 完成", "");
       return;
     }
