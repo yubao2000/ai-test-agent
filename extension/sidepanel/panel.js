@@ -147,8 +147,10 @@ async function sendMessage() {
       const toolSummary = toolResults.join("\n");
 
       // 显示 AI 回复 + 结果
-      const displayText = aiText + "\n\n" + toolSummary;
-      addMessage("ai", displayText.replace(/\n/g, "<br>"));
+      const displayWithTools = aiText.replace(/<TOOL>[\s\S]*?<\/TOOL>/g, "").trim();
+      if (displayWithTools) {
+        addMessage("ai", displayWithTools.replace(/\n/g, "<br>"));
+      }
 
       // 显示截图
       for (const imgUrl of pendingImages) {
@@ -157,15 +159,17 @@ async function sendMessage() {
         chatMessages.appendChild(imgDiv);
         chatMessages.scrollTop = chatMessages.scrollHeight;
       }
-      pendingImages = [];
 
-      fullDisplay += displayText;
+      fullDisplay += displayWithTools;
 
+      // 回传给 AI 的结果中排除截图
+      const aiFeedback = toolResults.filter(r => !r.startsWith("[screenshot]")).join("\n");
       messages.push({ role: "assistant", content: aiText });
       messages.push({
         role: "user",
-        content: `执行结果：\n${toolSummary}\n\n继续下一步。已完成请回复 ✅ 完成。`,
+        content: `执行结果：\n${aiFeedback || "已执行"}\n\n继续下一步。已完成请回复 ✅ 完成。`,
       });
+      pendingImages = [];
     }
 
     if (loopCount >= maxLoops) {
