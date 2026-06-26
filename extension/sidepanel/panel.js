@@ -71,8 +71,8 @@ async function sendMessage() {
   try {
     const pageInfo = await getCurrentTabInfo();
     const systemPrompt = `你是一个浏览器助手。高效完成任务。
-- 除非需要发现页面元素，否则不要每次都用 explore
-- 能用 navigate 直接跳转就不用在当前页 explore
+- 优先用 navigate 直接跳转到网站的城市子站（如房天下广州二手房: https://gz.esf.fang.com）
+- 避免在首页反复 explore 找城市入口
 - 不需要截图
 - 任务完成时调用 done(summary)
 
@@ -83,7 +83,7 @@ async function sendMessage() {
       { role: "user", content: text },
     ];
 
-    let maxRounds = 10;
+    let maxRounds = 6;
     let round = 0;
     let allImages = [];
     let fullReply = "";
