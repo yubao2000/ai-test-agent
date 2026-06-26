@@ -22,17 +22,29 @@ chrome.action.onClicked.addListener((tab) => {
 
 // ==================== 页面操作 API ====================
 
-/**
- * 在指定标签页中执行操作
- * 由 sidepanel 或 content-script 调用
- */
+// 透传 content-script 的操作列表
+const PASS_THROUGH_ACTIONS = [
+  "click", "rightClick", "fill", "clear", "hover", "highlight",
+  "pressKey", "select", "extract", "scroll", "evaluate",
+  "getLinks", "getImages", "getTable", "getFormFields",
+  "getHtml", "showImage", "screenshotElement",
+];
+
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   const handler = handlers[request.action];
   if (handler) {
     handler(request, sender).then(sendResponse).catch((err) => {
       sendResponse({ success: false, error: err.message });
     });
-    return true; // 异步响应
+    return true;
+  }
+
+  // 透传到 content-script
+  if (PASS_THROUGH_ACTIONS.includes(request.action)) {
+    sendToTab(request.tabId, request).then(sendResponse).catch((err) => {
+      sendResponse({ success: false, error: err.message });
+    });
+    return true;
   }
 });
 
