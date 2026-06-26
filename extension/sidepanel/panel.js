@@ -85,6 +85,48 @@ async function sendMessage() {
 <TOOL>extract</TOOL>
 
 当前页面: ${pageInfo.url}`;
+
+    const messages = [
+      { role: "system", content: systemPrompt },
+      { role: "user", content: text },
+    ];
+
+    setStatus("🤔 AI 规划中...");
+    const result = await chrome.runtime.sendMessage({ action: "callAI", messages });
+    if (!result.success) {
+      addMessage("system", `❌ ${result.error}`);
+      setStatus("❌ 出错", "error");
+      return;
+    }
+
+    const aiText = result.text;
+
+    const toolRegex = /<TOOL>([\s\S]*?)<\/TOOL>/g;
+    const tools = [];
+    let m;
+    while ((m = toolRegex.exec(aiText)) !== null) tools.push(m[1].trim());
+
+    if (tools.length === 0) {
+      addMessage("ai", aiText);
+      setStatus("✅ 完成", "");
+      return;
+    }
+
+    setStatus(`⏳ 执行 ${tools.length} 个步骤...`);
+    const images = [];
+    for (let i = 0; i < tools.length; i++) {
+      const toolCmd = tools[i];
+      setStatus(`⏳ (${i + 1}/${tools.length}) ${toolCmd.split("|")[0]}...`);
+      const r = await executeToolCommand(toolCmd);
+      if (r.imageUrl) images.push(r.imageUrl);
+    }
+
+    const displayText = aiText.replace(/<TOOL>[\s\S]*?<\/TOOL>/g, "").trim();
+    if (displayText) addMessage("ai", displayText.replace(/\n/g, "<br>"));
+
+    for (const imgUrl of images) {
+      const imgDiv = document.createElement("div");
+      imgDiv.innerHTML = `<img src="${imgUrl}" style="max-width:100%;border-radius:6px;margin:4px 0;box-shadow:0 2px 8px rgba(0,0,0,0.1)">`;
       chatMessages.appendChild(imgDiv);
       chatMessages.scrollTop = chatMessages.scrollHeight;
     }
@@ -97,7 +139,6 @@ async function sendMessage() {
     chatSend.disabled = false;
   }
 }
-
 /**
  * 执行 AI 发出的工具指令
  * 返回 { text, imageUrl }
