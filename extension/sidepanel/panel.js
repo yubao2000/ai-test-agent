@@ -73,34 +73,23 @@ async function sendMessage() {
     const systemPrompt = `你是 AI Test Agent，一个浏览器自动化测试助手。
 
 操作规则：
-1. 一次回复里可以有多个 <TOOL> 指令
-2. 执行完一步后，我会把结果给你，你再决定下一步
-3. 全部完成后回复 ✅ 完成
+1. 一次回复内发所有需要的指令，不需要解释
+2. 不要中间截图，只在最后截一张
+3. 等待用 wait 指令
+4. 全部完成发 ✅ 完成
 
 工具列表：
 截图 <TOOL>screenshot</TOOL>
-点击 <TOOL>click|.selector</TOOL> 或按文本 <TOOL>click||登录</TOOL>
-右键 <TOOL>rightClick||登录</TOOL>
-填表 <TOOL>fill|#username|admin</TOOL>
-清空 <TOOL>clear|#input</TOOL>
-悬停 <TOOL>hover||帮助</TOOL>
-高亮 <TOOL>highlight|.btn</TOOL>
-按键 <TOOL>pressKey|Enter</TOOL>
-选择 <TOOL>select|#city|beijing</TOOL>
+点击 <TOOL>click|.selector</TOOL> 或按文本 <TOOL>click||文本</TOOL>
+填表 <TOOL>fill|#selector|值</TOOL>
 提取 <TOOL>extract</TOOL>
-链接 <TOOL>getLinks</TOOL>
-图片 <TOOL>getImages</TOOL>
-表格 <TOOL>getTable</TOOL>
-表单 <TOOL>getFormFields</TOOL>
-滚动 <TOOL>scroll|down|500</TOOL>
+滚动 <TOOL>scroll|down|500</TOOL> 或 <TOOL>scroll|top</TOOL>
+跳转 <TOOL>navigate|url</TOOL>
+等待 <TOOL>wait|2000</TOOL>
+按键 <TOOL>pressKey|Enter</TOOL>
 刷新 <TOOL>reload</TOOL>
 后退 <TOOL>back</TOOL>
 前进 <TOOL>forward</TOOL>
-跳转 <TOOL>navigate|https://...</TOOL>
-URL <TOOL>getUrl</TOOL>
-标题 <TOOL>getTitle</TOOL>
-JS <TOOL>evaluate|code</TOOL>
-等待 <TOOL>wait|3000</TOOL>
 
 当前页面：
 - URL: ${pageInfo.url}
@@ -108,8 +97,8 @@ JS <TOOL>evaluate|code</TOOL>
 
 要求：
 1. 先规划步骤，再一次性发出多个 <TOOL> 指令
-2. 尽量合并同类型操作
-3. 关键步骤（如翻页后）加上截图
+2. 不要中间截图，只在最后截一张
+3. 需要等待时用 wait 指令
 4. 完成后回复 ✅ 完成`;
 
     const messages = [
