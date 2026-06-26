@@ -58,7 +58,7 @@ async function sendMessage() {
 
   const { settings } = await chrome.runtime.sendMessage({ action: "getSettings" });
   if (!settings.apiKey) {
-    addMessage("system", "请先在 ⚙️ 设置页配置 API Key");
+    addMessage("system", "请先在 ⚙ 设置页配置 API Key");
     switchTab("settings");
     return;
   }
@@ -70,18 +70,20 @@ async function sendMessage() {
 
   try {
     const pageInfo = await getCurrentTabInfo();
-    const systemPrompt = `你是一个浏览器助手。用 <TOOL> 指令操作浏览器。先用 explore 了解页面。
+    const systemPrompt = `你是一个浏览器助手。每轮先 explore 查看页面再操作。
 
-步骤:
-1. 先发 <TOOL>explore</TOOL> 查看页面（仅第一次）
-2. 然后在同一条回复里把所有操作指令发完
-3. 完成后回复 ✅ 完成
+规则:
+- 每轮: <TOOL>explore</TOOL> 探索页面 → 发出操作指令
+- 操作跟在 explore 后面一起发
+- 不要截图
+- 完成后回复 ✅ 完成
 
 示例:
 <TOOL>explore</TOOL>
-<TOOL>fill|#search|关键词</TOOL>
-<TOOL>pressKey|Enter</TOOL>
+<TOOL>click||广州二手房</TOOL>
 <TOOL>wait|2000</TOOL>
+<TOOL>explore</TOOL>
+<TOOL>click||价格排序</TOOL>
 <TOOL>extract</TOOL>
 
 当前页面: ${pageInfo.url}`;
@@ -91,41 +93,61 @@ async function sendMessage() {
       { role: "user", content: text },
     ];
 
-    setStatus("🤔 AI 规划中...");
-    const result = await chrome.runtime.sendMessage({ action: "callAI", messages });
-    if (!result.success) {
-      addMessage("system", `❌ ${result.error}`);
-      setStatus("❌ 出错", "error");
-      return;
+    let maxRounds = 6;
+    let round = 0;
+    let allImages = [];
+    let fullReply = "";
+
+    while (round < maxRounds) {
+      round++;
+      setStatus(`🤔 第 ${round}/${maxRounds} 轮...`);
+
+      const result = await chrome.runtime.sendMessage({ action: "callAI", messages });
+      if (!result.success) {
+        addMessage("system", `❌ ${result.error}`);
+        setStatus("❌ 出错", "error");
+        return;
+      }
+
+      const aiText = result.text;
+      console.log(`[AI 第${round}轮]`, aiText.slice(0, 300));
+
+      const toolRegex = /<TOOL>([\s\S]*?)<\/TOOL>/g;
+      const tools = [];
+      let m;
+      while ((m = toolRegex.exec(aiText)) !== null) tools.push(m[1].trim());
+
+      if (tools.length === 0) {
+        fullReply = aiText;
+        break;
+      }
+
+      for (let i = 0; i < tools.length; i++) {
+        const toolCmd = tools[i];
+        setStatus(`⚡ ${toolCmd.split("|")[0]} (${i + 1}/${tools.length})`);
+        const r = await executeToolCommand(toolCmd);
+        if (r.imageUrl) allImages.push(r.imageUrl);
+      }
+
+      const newPage = await getCurrentTabInfo();
+      messages.push({ role: "assistant", content: aiText });
+      messages.push({
+        role: "user",
+        content: `已执行。当前页面URL: ${newPage.url}
+标题: ${newPage.title}
+
+继续操作或回复 ✅ 完成。`,
+      });
     }
 
-    const aiText = result.text;
-    console.log("[AI]", aiText.slice(0,500));
-
-    const toolRegex = /<TOOL>([\s\S]*?)<\/TOOL>/g;
-    const tools = [];
-    let m;
-    while ((m = toolRegex.exec(aiText)) !== null) tools.push(m[1].trim());
-
-    if (tools.length === 0) {
-      addMessage("ai", aiText || "(AI 没有返回任何操作)");
-      setStatus("✅ 完成", "");
-      return;
+    if (fullReply) {
+      const displayText = fullReply.replace(/<TOOL>[\s\S]*?<\/TOOL>/g, "").trim();
+      if (displayText) addMessage("ai", displayText.replace(/\n/g, "<br>"));
+    } else {
+      addMessage("system", round >= maxRounds ? "⚠️ 步骤较多已自动结束" : "✅ 完成");
     }
 
-    setStatus(`⏳ 执行 ${tools.length} 个步骤...`);
-    const images = [];
-    for (let i = 0; i < tools.length; i++) {
-      const toolCmd = tools[i];
-      setStatus(`⏳ (${i + 1}/${tools.length}) ${toolCmd.split("|")[0]}...`);
-      const r = await executeToolCommand(toolCmd);
-      if (r.imageUrl) images.push(r.imageUrl);
-    }
-
-    const displayText = aiText.replace(/<TOOL>[\s\S]*?<\/TOOL>/g, "").trim();
-    if (displayText) addMessage("ai", displayText.replace(/\n/g, "<br>"));
-
-    for (const imgUrl of images) {
+    for (const imgUrl of allImages) {
       const imgDiv = document.createElement("div");
       imgDiv.innerHTML = `<img src="${imgUrl}" style="max-width:100%;border-radius:6px;margin:4px 0;box-shadow:0 2px 8px rgba(0,0,0,0.1)">`;
       chatMessages.appendChild(imgDiv);
@@ -140,10 +162,6 @@ async function sendMessage() {
     chatSend.disabled = false;
   }
 }
-/**
- * 执行 AI 发出的工具指令
- * 返回 { text, imageUrl }
- */
 async function executeToolCommand(cmd) {
   try {
     const parts = cmd.split("|").map((s) => s.trim());
