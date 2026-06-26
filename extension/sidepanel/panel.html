@@ -282,7 +282,14 @@
         <select id="apiProvider">
           <option value="openai">OpenAI</option>
           <option value="anthropic">Anthropic (Claude)</option>
+          <option value="custom">自定义（兼容 OpenAI 协议）</option>
         </select>
+      </div>
+
+      <div class="settings-group" id="apiUrlGroup" style="display:none">
+        <label for="apiUrl">API 地址</label>
+        <input type="url" id="apiUrl" placeholder="https://api.openai.com/v1">
+        <div class="hint">兼容 OpenAI 格式的 API 地址</div>
       </div>
 
       <div class="settings-group">
@@ -293,11 +300,16 @@
 
       <div class="settings-group">
         <label for="apiModel">模型</label>
-        <input type="text" id="apiModel" placeholder="gpt-4o-mini">
-        <div class="hint">默认 gpt-4o-mini / claude-3-haiku</div>
+        <select id="apiModel" style="width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px">
+          <option value="">点击加载或输入...</option>
+        </select>
+        <div class="hint">输入 API Key 后点击刷新加载模型列表，或手动输入模型名</div>
       </div>
 
-      <button class="btn-primary" id="saveSettings">💾 保存设置</button>
+      <div style="display:flex;gap:8px">
+        <button class="btn-primary" id="saveSettings" style="flex:1">💾 保存设置</button>
+        <button id="fetchModelsBtn" style="background:#e2e8f0;border:none;border-radius:8px;padding:10px 16px;font-size:13px;cursor:pointer;font-weight:600;white-space:nowrap">🔄 刷新模型</button>
+      </div>
       <div id="settingsStatus" style="margin-top:8px;font-size:12px;color:#64748b;text-align:center"></div>
     </div>
   </div>

@@ -209,11 +209,102 @@ function showResult(text) {
 
 // ==================== 设置功能 ====================
 
+// 显示/隐藏 API URL 输入框（选择"自定义"时显示）
+$("apiProvider").addEventListener("change", () => {
+  const show = $("apiProvider").value === "custom";
+  $("apiUrlGroup").style.display = show ? "block" : "none";
+});
+
+// 输入 Key 后自动加载模型列表
+let keyTimer = null;
+$("apiKey").addEventListener("input", () => {
+  clearTimeout(keyTimer);
+  keyTimer = setTimeout(() => {
+    if ($("apiKey").value.trim().length > 10) fetchModels();
+  }, 800);
+});
+
+// 刷新模型按钮
+$("fetchModelsBtn").addEventListener("click", fetchModels);
+
+async function fetchModels() {
+  const provider = $("apiProvider").value;
+  const apiKey = $("apiKey").value.trim();
+  const apiUrl = $("apiUrl").value.trim();
+
+  if (!apiKey) {
+    $("settingsStatus").textContent = "⚠️ 请先输入 API Key";
+    return;
+  }
+
+  $("settingsStatus").textContent = "⏳ 加载模型列表...";
+  const select = $("apiModel");
+
+  try {
+    let models = [];
+
+    if (provider === "openai") {
+      const resp = await fetch("https://api.openai.com/v1/models", {
+        headers: { Authorization: `Bearer ${apiKey}` },
+      });
+      if (!resp.ok) throw new Error("API Key 无效");
+      const data = await resp.json();
+      models = data.data
+        .filter((m) => m.id.startsWith("gpt") || m.id.startsWith("o"))
+        .map((m) => m.id)
+        .sort();
+    } else if (provider === "anthropic") {
+      // Anthropic 模型列表相对固定，预置常用模型
+      models = [
+        "claude-3-5-sonnet-20241022",
+        "claude-3-5-haiku-20241022",
+        "claude-3-opus-20240229",
+        "claude-3-sonnet-20240229",
+        "claude-3-haiku-20240307",
+      ];
+    } else if (provider === "custom") {
+      const baseUrl = apiUrl.replace(/\/+$/, "") || "https://api.openai.com/v1";
+      const resp = await fetch(`${baseUrl}/models`, {
+        headers: { Authorization: `Bearer ${apiKey}` },
+      });
+      if (!resp.ok) throw new Error("无法获取模型列表，请检查 API 地址和 Key");
+      const data = await resp.json();
+      models = (data.data || []).map((m) => m.id).sort();
+    }
+
+    if (models.length === 0) {
+      $("settingsStatus").textContent = "⚠️ 未找到可用模型";
+      return;
+    }
+
+    // 更新下拉框
+    select.innerHTML = "";
+    models.forEach((m) => {
+      const opt = document.createElement("option");
+      opt.value = m;
+      opt.textContent = m;
+      select.appendChild(opt);
+    });
+
+    // 默认选中第一个
+    if (models.length > 0) select.value = models[0];
+
+    $("settingsStatus").textContent = `✅ 已加载 ${models.length} 个模型`;
+    setTimeout(() => { $("settingsStatus").textContent = ""; }, 3000);
+  } catch (err) {
+    $("settingsStatus").textContent = `❌ ${err.message}`;
+    // 允许手动输入模型名
+    select.innerHTML = `<option value="">点击加载或输入...</option>`;
+    select.setAttribute("type", "text");
+  }
+}
+
 $("saveSettings").addEventListener("click", async () => {
   const settings = {
     apiKey: $("apiKey").value.trim(),
     apiProvider: $("apiProvider").value,
     apiModel: $("apiModel").value.trim(),
+    apiUrl: $("apiUrl").value.trim(),
   };
 
   if (!settings.apiKey) {

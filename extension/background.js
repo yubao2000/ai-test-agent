@@ -104,16 +104,18 @@ const handlers = {
 
   // --- AI API ---
   async callAI(req) {
-    const settings = await chrome.storage.local.get(["apiKey", "apiProvider"]);
+    const settings = await chrome.storage.local.get(["apiKey", "apiProvider", "apiModel", "apiUrl"]);
     const apiKey = req.apiKey || settings.apiKey;
     const provider = req.provider || settings.apiProvider || "openai";
+    const apiUrl = req.apiUrl || settings.apiUrl || "";
+    const model = req.model || settings.apiModel || "";
 
     if (!apiKey) {
       return { success: false, error: "请先设置 API Key（在侧面板设置页）" };
     }
 
     try {
-      const result = await callAIAPI(provider, apiKey, req.messages, req.model);
+      const result = await callAIAPI(provider, apiKey, req.messages, model, apiUrl);
       return { success: true, text: result };
     } catch (err) {
       return { success: false, error: err.message };
@@ -127,7 +129,7 @@ const handlers = {
   },
 
   async getSettings() {
-    const settings = await chrome.storage.local.get(["apiKey", "apiProvider", "apiModel"]);
+    const settings = await chrome.storage.local.get(["apiKey", "apiProvider", "apiModel", "apiUrl"]);
     return { success: true, settings };
   },
 
@@ -171,7 +173,7 @@ async function sendToTab(tabId, msg) {
   }
 }
 
-async function callAIAPI(provider, apiKey, messages, model) {
+async function callAIAPI(provider, apiKey, messages, model, apiUrl) {
   if (provider === "openai") {
     const resp = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
@@ -209,5 +211,21 @@ async function callAIAPI(provider, apiKey, messages, model) {
     return data.content[0].text;
   }
 
-  throw new Error(`不支持的 AI 提供商: ${provider}`);
+  // 自定义（兼容 OpenAI 协议）
+  const baseUrl = (apiUrl || "https://api.openai.com/v1").replace(/\/+$/, "");
+  const resp = await fetch(`${baseUrl}/chat/completions`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${apiKey}`,
+    },
+    body: JSON.stringify({
+      model: model || "gpt-4o-mini",
+      messages,
+      temperature: 0.7,
+    }),
+  });
+  const data = await resp.json();
+  if (!resp.ok) throw new Error(data.error?.message || "API 调用失败");
+  return data.choices[0].message.content;
 }
