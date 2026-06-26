@@ -92,77 +92,54 @@ async function sendMessage() {
       { role: "user", content: text },
     ];
 
-    let fullDisplay = "";
-    let maxLoops = 25;
-    let loopCount = 0;
-    let pendingImages = [];
+    const messages = [
+      { role: "system", content: systemPrompt },
+      { role: "user", content: text },
+    ];
 
-    while (loopCount < maxLoops) {
-      loopCount++;
-      setStatus(`🤔 AI 思考中 (${loopCount}/${maxLoops})...`);
-
-      const result = await chrome.runtime.sendMessage({ action: "callAI", messages });
-      if (!result.success) {
-        addMessage("system", `❌ ${result.error}`);
-        setStatus("❌ 出错", "error");
-        return;
-      }
-
-      const aiText = result.text;
-
-      const toolRegex = /<TOOL>([\s\S]*?)<\/TOOL>/g;
-      const tools = [];
-      let m;
-      while ((m = toolRegex.exec(aiText)) !== null) tools.push(m[1].trim());
-
-      if (tools.length === 0) {
-        addMessage("ai", aiText);
-        fullDisplay += aiText;
-        break;
-      }
-
-      // 执行工具，收集结果和图片
-      const toolResults = [];
-      for (const toolCmd of tools) {
-        const r = await executeToolCommand(toolCmd);
-        const text = r.text.replace(/<[^>]*>/g, "").trim();
-        toolResults.push(`[${toolCmd}] ${text}`);
-        if (r.imageUrl) pendingImages.push(r.imageUrl);
-      }
-
-      const toolSummary = toolResults.join("\n");
-
-      // 显示 AI 回复 + 结果
-      const displayWithTools = aiText.replace(/<TOOL>[\s\S]*?<\/TOOL>/g, "").trim();
-      if (displayWithTools) {
-        addMessage("ai", displayWithTools.replace(/\n/g, "<br>"));
-      }
-
-      // 显示截图
-      for (const imgUrl of pendingImages) {
-        const imgDiv = document.createElement("div");
-        imgDiv.innerHTML = `<img src="${imgUrl}" style="max-width:100%;border-radius:6px;margin:4px 0;box-shadow:0 2px 8px rgba(0,0,0,0.1)">`;
-        chatMessages.appendChild(imgDiv);
-        chatMessages.scrollTop = chatMessages.scrollHeight;
-      }
-
-      fullDisplay += displayWithTools;
-
-      // 回传给 AI 的结果中排除截图
-      const aiFeedback = toolResults.filter(r => !r.startsWith("[screenshot]")).join("\n");
-      messages.push({ role: "assistant", content: aiText });
-      messages.push({
-        role: "user",
-        content: `执行结果：\n${aiFeedback || "已执行"}\n\n继续下一步。已完成请回复 ✅ 完成。`,
-      });
-      pendingImages = [];
+    setStatus("🤔 AI 规划中...");
+    const result = await chrome.runtime.sendMessage({ action: "callAI", messages });
+    if (!result.success) {
+      addMessage("system", `❌ ${result.error}`);
+      setStatus("❌ 出错", "error");
+      return;
     }
 
-    if (loopCount >= maxLoops) {
-      addMessage("system", "⚠️ 步骤过多已自动停止");
+    const aiText = result.text;
+
+    const toolRegex = /<TOOL>([\s\S]*?)<\/TOOL>/g;
+    const tools = [];
+    let m;
+    while ((m = toolRegex.exec(aiText)) !== null) tools.push(m[1].trim());
+
+    if (tools.length === 0) {
+      addMessage("ai", aiText);
+      setStatus("✅ 完成", "");
+      return;
     }
-    setStatus("✅ 完成", "");
-  } catch (err) {
+
+    setStatus(`⏳ 执行 ${tools.length} 个步骤...`);
+    const results = [];
+    const images = [];
+    for (let i = 0; i < tools.length; i++) {
+      const toolCmd = tools[i];
+      setStatus(`⏳ (${i + 1}/${tools.length}) ${toolCmd.split("|")[0]}...`);
+      const r = await executeToolCommand(toolCmd);
+      results.push(`[${toolCmd}] ${r.text.replace(/<[^>]*>/g, "").trim()}`);
+      if (r.imageUrl) images.push(r.imageUrl);
+    }
+
+    const displayText = aiText.replace(/<TOOL>[\s\S]*?<\/TOOL>/g, "").trim();
+    if (displayText) addMessage("ai", displayText.replace(/\n/g, "<br>"));
+
+    for (const imgUrl of images) {
+      const imgDiv = document.createElement("div");
+      imgDiv.innerHTML = `<img src="${imgUrl}" style="max-width:100%;border-radius:6px;margin:4px 0;box-shadow:0 2px 8px rgba(0,0,0,0.1)">`;
+      chatMessages.appendChild(imgDiv);
+      chatMessages.scrollTop = chatMessages.scrollHeight;
+    }
+
+    setStatus("✅ 完成", "");  } catch (err) {
     addMessage("system", `❌ ${err.message}`);
     setStatus("❌ 出错", "error");
   } finally {
