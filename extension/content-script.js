@@ -92,6 +92,13 @@ const handlers = {
     const result = eval(req.code);
     return { success: true, result: JSON.stringify(result) };
   },
+
+  /** 显示截图（新标签页中） */
+  async showImage(req) {
+    document.body.innerHTML = `<img src="${req.dataUrl}" style="max-width:100%;height:auto;">`;
+    document.title = "截图 - AI Test Agent";
+    return { success: true };
+  },
 };
 
 // ==================== 辅助函数 ====================
