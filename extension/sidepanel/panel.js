@@ -74,9 +74,7 @@ async function sendMessage() {
 
 操作规则：
 1. 一次回复内发所有需要的指令，不需要解释
-2. 不要中间截图，只在最后截一张
-3. 等待用 wait 指令
-4. 全部完成发 ✅ 完成
+2. 等待用 wait 指令，完成后回复 ✅ 完成
 
 工具列表：
 截图 <TOOL>screenshot</TOOL>
