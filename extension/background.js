@@ -28,6 +28,7 @@ const PASS_THROUGH_ACTIONS = [
   "pressKey", "select", "extract", "scroll", "evaluate",
   "getLinks", "getImages", "getTable", "getFormFields",
   "getHtml", "showImage", "screenshotElement",
+  "explore",
 ];
 
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {

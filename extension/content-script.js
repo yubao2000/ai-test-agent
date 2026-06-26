@@ -223,6 +223,43 @@ const handlers = {
     return { success: true, fields: inputs };
   },
 
+  /** 探索页面：返回交互元素列表供 AI 参考 */
+  async explore() {
+    const inputs = Array.from(document.querySelectorAll("input, select, textarea, button, a, [role=button]")).slice(0, 50);
+    const elements = inputs.map((el) => {
+      const tag = el.tagName.toLowerCase();
+      const text = el.innerText?.trim?.() || el.value?.trim?.() || el.placeholder?.trim?.() || el.alt?.trim?.() || "";
+      const rect = el.getBoundingClientRect();
+      return {
+        tag,
+        text: text.slice(0, 40),
+        id: el.id || "",
+        class: (el.className || "").slice(0, 40),
+        type: el.type || "",
+        name: el.name || "",
+        href: el.href || "",
+        visible: rect.width > 0 && rect.height > 0,
+        selector: el.id ? `#${el.id}` : el.name ? `[name="${el.name}"]` : text ? tag : "",
+        label: text ? `${tag}: "${text.slice(0, 30)}"` : tag,
+      };
+    }).filter((e) => e.visible && (e.text || e.id || e.name));
+
+    // 提取页面摘要
+    const title = document.title;
+    const headings = Array.from(document.querySelectorAll("h1, h2, h3")).slice(0, 15).map((h) => h.innerText.trim()).filter(Boolean);
+    const links = Array.from(document.querySelectorAll("a[href]")).slice(0, 30).map((a) => ({ text: (a.innerText.trim() || "").slice(0, 30), href: a.href }));
+
+    return {
+      success: true,
+      title,
+      url: location.href,
+      headings,
+      elements,
+      links,
+      elementCount: elements.length,
+    };
+  },
+
   /** 显示截图（新标签页中） */
   async showImage(req) {
     document.body.innerHTML = `<img src="${req.dataUrl}" style="max-width:100%;height:auto;">`;

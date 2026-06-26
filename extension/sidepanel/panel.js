@@ -70,66 +70,21 @@ async function sendMessage() {
 
   try {
     const pageInfo = await getCurrentTabInfo();
-    const systemPrompt = `你是一个浏览器助手。一次性规划所有步骤并发出所有指令。
+    const systemPrompt = `你是一个浏览器助手。先用 explore 了解页面有哪些元素。
 
-规则：
-- 用户说"截图"才截图，否则只操作不截图
-- 每个指令独立放在 <TOOL></TOOL> 中
-- 所有指令一次发出，不要分步
-- 完成后回复 ✅ 完成
+步骤:
+1. 先发 <TOOL>explore</TOOL> 查看页面上有什么
+2. 根据探索结果用精确保选器操作
+3. 完成后回复 ✅ 完成
 
-示例：打开网页搜索并截图：
-<TOOL>navigate|url</TOOL>
-<TOOL>fill|#s|关键词</TOOL>
+示例:
+<TOOL>explore</TOOL>
+<TOOL>fill|#search|关键词</TOOL>
 <TOOL>pressKey|Enter</TOOL>
 <TOOL>wait|2000</TOOL>
-<TOOL>screenshot</TOOL>
+<TOOL>extract</TOOL>
 
-当前 URL: ${pageInfo.url}`
-
-    const messages = [
-      { role: "system", content: systemPrompt },
-      { role: "user", content: text },
-    ];
-
-    setStatus("🤔 AI 规划中...");
-    const result = await chrome.runtime.sendMessage({ action: "callAI", messages });
-    if (!result.success) {
-      addMessage("system", `❌ ${result.error}`);
-      setStatus("❌ 出错", "error");
-      return;
-    }
-
-    const aiText = result.text;
-
-    const toolRegex = /<TOOL>([\s\S]*?)<\/TOOL>/g;
-    const tools = [];
-    let m;
-    while ((m = toolRegex.exec(aiText)) !== null) tools.push(m[1].trim());
-
-    if (tools.length === 0) {
-      addMessage("ai", aiText);
-      setStatus("✅ 完成", "");
-      return;
-    }
-
-    setStatus(`⏳ 执行 ${tools.length} 个步骤...`);
-    const results = [];
-    const images = [];
-    for (let i = 0; i < tools.length; i++) {
-      const toolCmd = tools[i];
-      setStatus(`⏳ (${i + 1}/${tools.length}) ${toolCmd.split("|")[0]}...`);
-      const r = await executeToolCommand(toolCmd);
-      results.push(`[${toolCmd}] ${r.text.replace(/<[^>]*>/g, "").trim()}`);
-      if (r.imageUrl) images.push(r.imageUrl);
-    }
-
-    const displayText = aiText.replace(/<TOOL>[\s\S]*?<\/TOOL>/g, "").trim();
-    if (displayText) addMessage("ai", displayText.replace(/\n/g, "<br>"));
-
-    for (const imgUrl of images) {
-      const imgDiv = document.createElement("div");
-      imgDiv.innerHTML = `<img src="${imgUrl}" style="max-width:100%;border-radius:6px;margin:4px 0;box-shadow:0 2px 8px rgba(0,0,0,0.1)">`;
+当前页面: ${pageInfo.url}`;
       chatMessages.appendChild(imgDiv);
       chatMessages.scrollTop = chatMessages.scrollHeight;
     }
@@ -261,6 +216,19 @@ async function executeToolCommand(cmd) {
       case "wait": {
         await chrome.runtime.sendMessage({ action: "wait", ms: parseInt(params[0]) || 2000 });
         return { text: `⏱️ 等待 ${params[0] || 2000}ms` };
+      }
+      case "explore": {
+        const r = await chrome.runtime.sendMessage({ action: "explore", tabId: currentTabId });
+        if (r.success) {
+          let info = `📄 ${r.title}\n🔗 ${r.url}\n`;
+          if (r.headings.length) info += `标题: ${r.headings.join(" → ")}\n`;
+          info += `\n交互元素 (${r.elements.length}):\n`;
+          r.elements.slice(0, 20).forEach((el) => {
+            info += `  ${el.label} (${el.selector || el.class})\n`;
+          });
+          return { text: info };
+        }
+        return { text: `❌ ${r.error}` };
       }
       default:
         return { text: `⚠️ 未知指令: ${action}` };
