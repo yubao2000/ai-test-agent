@@ -92,11 +92,6 @@ async function sendMessage() {
       { role: "user", content: text },
     ];
 
-    const messages = [
-      { role: "system", content: systemPrompt },
-      { role: "user", content: text },
-    ];
-
     setStatus("🤔 AI 规划中...");
     const result = await chrome.runtime.sendMessage({ action: "callAI", messages });
     if (!result.success) {
