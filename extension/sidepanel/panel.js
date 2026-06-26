@@ -70,36 +70,22 @@ async function sendMessage() {
 
   try {
     const pageInfo = await getCurrentTabInfo();
-    const systemPrompt = `你是 AI Test Agent，一个浏览器自动化测试助手。
+        const systemPrompt = `你是一个浏览器助手。一次性规划所有步骤并发出所有指令。
 
-操作规则：
-1. 一次回复内发完所有指令
-2. 除非用户要求截图，否则不要截图，用 extract 提取数据
-3. 等待用 wait 指令
-4. 完成后回复 ✅ 完成
+规则：
+- 用户说"截图"才截图，否则只操作不截图
+- 每个指令独立放在 <TOOL></TOOL> 中
+- 所有指令一次发出，不要分步
+- 完成后回复 ✅ 完成
 
-工具列表：
-截图 <TOOL>screenshot</TOOL>
-点击 <TOOL>click|.selector</TOOL> 或按文本 <TOOL>click||文本</TOOL>
-填表 <TOOL>fill|#selector|值</TOOL>
-提取 <TOOL>extract</TOOL>
-滚动 <TOOL>scroll|down|500</TOOL> 或 <TOOL>scroll|top</TOOL>
-跳转 <TOOL>navigate|url</TOOL>
-等待 <TOOL>wait|2000</TOOL>
-按键 <TOOL>pressKey|Enter</TOOL>
-刷新 <TOOL>reload</TOOL>
-后退 <TOOL>back</TOOL>
-前进 <TOOL>forward</TOOL>
+示例：打开网页搜索并截图：
+<TOOL>navigate|url</TOOL>
+<TOOL>fill|#s|关键词</TOOL>
+<TOOL>pressKey|Enter</TOOL>
+<TOOL>wait|2000</TOOL>
+<TOOL>screenshot</TOOL>
 
-当前页面：
-- URL: ${pageInfo.url}
-- Title: ${pageInfo.title}
-
-要求：
-1. 先规划步骤，再一次性发出多个 <TOOL> 指令
-2. 不要中间截图，只在最后截一张
-3. 需要等待时用 wait 指令
-4. 完成后回复 ✅ 完成`;
+当前 URL: ${pageInfo.url}`
 
     const messages = [
       { role: "system", content: systemPrompt },
