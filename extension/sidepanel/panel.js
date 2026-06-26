@@ -72,72 +72,99 @@ async function sendMessage() {
     const pageInfo = await getCurrentTabInfo();
     const systemPrompt = `你是 AI Test Agent，一个浏览器自动化测试助手。
 
-当前页面信息：
+操作规则：
+1. 一次回复里可以有多个 <TOOL> 指令
+2. 执行完一步后，我会把结果给你，你再决定下一步
+3. 全部完成后回复 ✅ 完成
+
+工具列表：
+截图 <TOOL>screenshot</TOOL>
+点击 <TOOL>click|.selector</TOOL> 或按文本 <TOOL>click||登录</TOOL>
+右键 <TOOL>rightClick||登录</TOOL>
+填表 <TOOL>fill|#username|admin</TOOL>
+清空 <TOOL>clear|#input</TOOL>
+悬停 <TOOL>hover||帮助</TOOL>
+高亮 <TOOL>highlight|.btn</TOOL>
+按键 <TOOL>pressKey|Enter</TOOL>
+选择 <TOOL>select|#city|beijing</TOOL>
+提取 <TOOL>extract</TOOL>
+链接 <TOOL>getLinks</TOOL>
+图片 <TOOL>getImages</TOOL>
+表格 <TOOL>getTable</TOOL>
+表单 <TOOL>getFormFields</TOOL>
+滚动 <TOOL>scroll|down|500</TOOL>
+刷新 <TOOL>reload</TOOL>
+后退 <TOOL>back</TOOL>
+前进 <TOOL>forward</TOOL>
+跳转 <TOOL>navigate|https://...</TOOL>
+URL <TOOL>getUrl</TOOL>
+标题 <TOOL>getTitle</TOOL>
+JS <TOOL>evaluate|code</TOOL>
+等待 <TOOL>wait|3000</TOOL>
+
+当前页面：
 - URL: ${pageInfo.url}
-- Title: ${pageInfo.title}
-
-你可以使用以下工具来操作浏览器。回复时插入 <TOOL>指令</TOOL> 即可执行操作：
-
-📸 截图：<TOOL>screenshot</TOOL>
-🖱️ 点击：<TOOL>click|.selector</TOOL> 或按文本 <TOOL>click||登录</TOOL>
-✋ 右键：<TOOL>rightClick||登录</TOOL>
-⌨️ 填表：<TOOL>fill|#username|admin</TOOL>
-🗑️ 清空：<TOOL>clear|#input</TOOL>
-🔍 悬停：<TOOL>hover||帮助</TOOL>
-✨ 高亮：<TOOL>highlight|.btn</TOOL>
-⌨️ 按键：<TOOL>pressKey|Enter</TOOL>
-🔽 下拉选择：<TOOL>select|#city|beijing</TOOL>
-📄 提取文字：<TOOL>extract</TOOL> 或 <TOOL>extract|.article</TOOL>
-🔗 所有链接：<TOOL>getLinks</TOOL>
-🖼️ 所有图片：<TOOL>getImages</TOOL>
-📊 表格数据：<TOOL>getTable</TOOL> 或 <TOOL>getTable|#table</TOOL>
-📝 表单字段：<TOOL>getFormFields</TOOL>
-⬇️ 滚动：<TOOL>scroll|down|500</TOOL> 或 <TOOL>scroll|top</TOOL>
-🔄 刷新：<TOOL>reload</TOOL>
-⬅️ 后退：<TOOL>back</TOOL>
-➡️ 前进：<TOOL>forward</TOOL>
-🌐 跳转：<TOOL>navigate|https://...</TOOL>
-🔗 当前URL：<TOOL>getUrl</TOOL>
-📌 标题：<TOOL>getTitle</TOOL>
-⚡ 执行JS：<TOOL>evaluate|document.title</TOOL>
-⏱️ 等待：<TOOL>wait|3000</TOOL>
-
-回复时文字和 <TOOL> 指令混用即可，工具执行结果会自动显示。`;
+- Title: ${pageInfo.title}`;
 
     const messages = [
       { role: "system", content: systemPrompt },
       { role: "user", content: text },
     ];
 
-    const result = await chrome.runtime.sendMessage({
-      action: "callAI",
-      messages,
-    });
+    let fullDisplay = "";
+    let maxLoops = 15;
+    let loopCount = 0;
 
-    if (!result.success) {
-      addMessage("system", `❌ ${result.error}`);
-      setStatus("❌ 出错", "error");
-      return;
+    while (loopCount < maxLoops) {
+      loopCount++;
+      setStatus(`🤔 AI 思考中 (${loopCount}/${maxLoops})...`);
+
+      const result = await chrome.runtime.sendMessage({ action: "callAI", messages });
+      if (!result.success) {
+        addMessage("system", `❌ ${result.error}`);
+        setStatus("❌ 出错", "error");
+        return;
+      }
+
+      const aiText = result.text;
+
+      // 提取所有工具指令
+      const toolRegex = /<TOOL>([\s\S]*?)<\/TOOL>/g;
+      const tools = [];
+      let m;
+      while ((m = toolRegex.exec(aiText)) !== null) tools.push(m[1].trim());
+
+      if (tools.length === 0) {
+        addMessage("ai", aiText);
+        fullDisplay += aiText;
+        break;
+      }
+
+      // 执行工具
+      const toolResults = [];
+      for (const toolCmd of tools) {
+        const resultHtml = await executeToolCommand(toolCmd);
+        toolResults.push(`[${toolCmd}] ${resultHtml.replace(/<[^>]*>/g, "").trim()}`);
+      }
+
+      const toolSummary = toolResults.join("\n");
+
+      // 显示 AI 回复 + 工具结果
+      const displayText = `${aiText}\n\n[结果]\n${toolSummary}`;
+      addMessage("ai", displayText.replace(/\n/g, "<br>"));
+      fullDisplay += displayText;
+
+      // 继续循环：把结果喂回 AI
+      messages.push({ role: "assistant", content: aiText });
+      messages.push({
+        role: "user",
+        content: `工具执行结果：\n${toolSummary}\n\n请根据结果继续操作。已完成请回复 ✅ 完成。`,
+      });
     }
 
-    // 解析并执行 AI 回复中的工具指令
-    const aiText = result.text;
-    const toolRegex = /<TOOL>([\s\S]*?)<\/TOOL>/g;
-    let match;
-    let lastIdx = 0;
-    let finalText = "";
-
-    while ((match = toolRegex.exec(aiText)) !== null) {
-      // 添加工具指令前的文本
-      finalText += aiText.slice(lastIdx, match.index);
-      lastIdx = toolRegex.lastIndex;
-
-      const toolCmd = match[1].trim();
-      finalText += await executeToolCommand(toolCmd);
+    if (loopCount >= maxLoops) {
+      addMessage("system", "⚠️ 步骤过多已自动停止");
     }
-    finalText += aiText.slice(lastIdx);
-
-    addMessage("ai", finalText);
     setStatus("✅ 完成", "");
   } catch (err) {
     addMessage("system", `❌ ${err.message}`);
