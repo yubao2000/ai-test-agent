@@ -282,14 +282,17 @@
         <select id="apiProvider">
           <option value="openai">OpenAI</option>
           <option value="anthropic">Anthropic (Claude)</option>
-          <option value="custom">自定义（兼容 OpenAI 协议）</option>
+          <option value="custom">自定义（Ollama / vLLM / LocalAI ...）</option>
         </select>
       </div>
 
-      <div class="settings-group" id="apiUrlGroup" style="display:none">
+      <div class="settings-group">
         <label for="apiUrl">API 地址</label>
         <input type="url" id="apiUrl" placeholder="https://api.openai.com/v1">
-        <div class="hint">兼容 OpenAI 格式的 API 地址</div>
+        <div class="hint">
+          OpenAI 默认 · Ollama → http://localhost:11434/v1 · vLLM → http://localhost:8000/v1<br>
+          填入基础地址即可，系统自动拼接 /chat/completions
+        </div>
       </div>
 
       <div class="settings-group">

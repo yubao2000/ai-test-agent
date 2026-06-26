@@ -212,8 +212,11 @@ async function callAIAPI(provider, apiKey, messages, model, apiUrl) {
   }
 
   // 自定义（兼容 OpenAI 协议）
-  const baseUrl = (apiUrl || "https://api.openai.com/v1").replace(/\/+$/, "");
-  const resp = await fetch(`${baseUrl}/chat/completions`, {
+  // 如果用户已经输入了完整路径（含 /chat/completions），直接使用
+  // 否则拼接 /chat/completions
+  const base = (apiUrl || "https://api.openai.com/v1").replace(/\/+$/, "");
+  const endpoint = base.endsWith("/chat/completions") ? base : `${base}/chat/completions`;
+  const resp = await fetch(endpoint, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",

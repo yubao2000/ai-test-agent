@@ -209,10 +209,17 @@ function showResult(text) {
 
 // ==================== 设置功能 ====================
 
-// 显示/隐藏 API URL 输入框（选择"自定义"时显示）
+// 切换提供商时自动填充 API 地址
+const DEFAULT_API_URLS = {
+  openai: "https://api.openai.com/v1",
+  anthropic: "https://api.anthropic.com",
+  custom: "http://localhost:11434/v1",
+};
+
 $("apiProvider").addEventListener("change", () => {
-  const show = $("apiProvider").value === "custom";
-  $("apiUrlGroup").style.display = show ? "block" : "none";
+  $("apiUrl").value = DEFAULT_API_URLS[$("apiProvider").value] || "";
+  // 自定义时聚焦地址输入框提示用户修改
+  if ($("apiProvider").value === "custom") $("apiUrl").focus();
 });
 
 // 输入 Key 后自动加载模型列表
@@ -263,8 +270,12 @@ async function fetchModels() {
         "claude-3-haiku-20240307",
       ];
     } else if (provider === "custom") {
-      const baseUrl = apiUrl.replace(/\/+$/, "") || "https://api.openai.com/v1";
-      const resp = await fetch(`${baseUrl}/models`, {
+      const baseUrl = (apiUrl || "https://api.openai.com/v1").replace(/\/+$/, "");
+      // 如果地址已经包含 /chat/completions，替换为 /models
+      const modelUrl = baseUrl.includes("/chat/completions")
+        ? baseUrl.replace("/chat/completions", "/models")
+        : `${baseUrl}/models`;
+      const resp = await fetch(modelUrl, {
         headers: { Authorization: `Bearer ${apiKey}` },
       });
       if (!resp.ok) throw new Error("无法获取模型列表，请检查 API 地址和 Key");
