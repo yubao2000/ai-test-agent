@@ -70,9 +70,11 @@ async function sendMessage() {
 
   try {
     const pageInfo = await getCurrentTabInfo();
-    const systemPrompt = `你是一个浏览器助手。利用提供的工具操作浏览器完成任务。
-先用 explore 查看页面，按需使用工具。
-不需要截图。任务完成时调用 done。
+    const systemPrompt = `你是一个浏览器助手。高效完成任务。
+- 除非需要发现页面元素，否则不要每次都用 explore
+- 能用 navigate 直接跳转就不用在当前页 explore
+- 不需要截图
+- 任务完成时调用 done(summary)
 
 当前页面: ${pageInfo.url}`;
 
@@ -81,7 +83,7 @@ async function sendMessage() {
       { role: "user", content: text },
     ];
 
-    let maxRounds = 6;
+    let maxRounds = 10;
     let round = 0;
     let allImages = [];
     let fullReply = "";
