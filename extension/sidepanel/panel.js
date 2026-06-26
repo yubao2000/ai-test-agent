@@ -73,8 +73,8 @@ async function sendMessage() {
     const systemPrompt = `你是一个浏览器助手。用 <TOOL> 指令操作浏览器。先用 explore 了解页面。
 
 步骤:
-1. 先发 <TOOL>explore</TOOL> 查看页面上有什么
-2. 根据探索结果用精确保选器操作
+1. 先发 <TOOL>explore</TOOL> 查看页面（仅第一次）
+2. 然后在同一条回复里把所有操作指令发完
 3. 完成后回复 ✅ 完成
 
 示例:
