@@ -70,7 +70,7 @@ async function sendMessage() {
 
   try {
     const pageInfo = await getCurrentTabInfo();
-        const systemPrompt = `你是一个浏览器助手。一次性规划所有步骤并发出所有指令。
+    const systemPrompt = `你是一个浏览器助手。一次性规划所有步骤并发出所有指令。
 
 规则：
 - 用户说"截图"才截图，否则只操作不截图
@@ -139,7 +139,8 @@ async function sendMessage() {
       chatMessages.scrollTop = chatMessages.scrollHeight;
     }
 
-    setStatus("✅ 完成", "");  } catch (err) {
+    setStatus("✅ 完成", "");
+  } catch (err) {
     addMessage("system", `❌ ${err.message}`);
     setStatus("❌ 出错", "error");
   } finally {
